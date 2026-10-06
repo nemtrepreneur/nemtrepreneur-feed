@@ -4,7 +4,7 @@
    no-JS fallback (old checklist + sources), so crawlers and script failures still see every source. */
 (function () {
   var BASE = (document.currentScript && document.currentScript.src || 'https://nemtrepreneur.github.io/nemtrepreneur-feed/rankings/').replace(/[^\/]*$/, '');
-  var DATA = BASE + 'v2.json?v=20261006';
+  var DATA = BASE + 'v2.json?v=20261006b';
   var METH = '#methodology';
   var TABS = { transparency: 'Transparency', features: 'Features', track: 'Track record' };
 
@@ -110,6 +110,92 @@
   }
   function fmt(d) { var m = /^(\d+)-(\d+)-(\d+)$/.exec(d); var M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; return m ? M[+m[2] - 1] + ' ' + (+m[3]) + ', ' + m[1] : d; }
 
+
+  /* Sticky left rail (Oct 6 2026, Nick): jump links, filters and vendor list. Shows once the reader scrolls past the
+     "On this page" chips. Desktop: fixed in the left margin. Narrow screens: a floating "Jump to" button opens it. */
+  var RCSS = '.rk-rail{position:fixed;top:88px;z-index:40;font-size:13px;line-height:1.35;color:#131313;max-height:calc(100vh - 104px);overflow:auto;opacity:0;visibility:hidden;transform:translateX(-6px);transition:opacity .2s,transform .2s,visibility .2s;scrollbar-width:thin}' +
+    '.rk-rail.on{opacity:1;visibility:visible;transform:none}' +
+    '.rk-rail h5{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5B6B7B;margin:14px 0 6px;font-weight:700}.rk-rail h5:first-child{margin-top:0}' +
+    '.rk-rail a{display:flex;justify-content:space-between;gap:8px;color:#131313;text-decoration:none;padding:4px 8px;border-radius:6px;border-left:2px solid transparent}' +
+    '.rk-rail a:hover{background:#F3F5F7}.rk-rail a.cur{border-left-color:#D97706;background:#FFF4DC;font-weight:700}.rk-rail a small{color:#5B6B7B;font-weight:400}' +
+    '.rk-rail a.dim{opacity:.35}.rk-rail select{width:100%;font:inherit;font-size:13px;padding:5px 6px;border:1px solid #E3E9EF;border-radius:6px;background:#fff;color:#131313}' +
+    '.rk-rail label{display:flex;gap:6px;align-items:flex-start;padding:3px 2px;margin:0;cursor:pointer;text-transform:none;letter-spacing:normal;font-weight:400;font-size:13px;line-height:1.35;color:#131313}'+'.rk-rail label span{text-transform:none;letter-spacing:normal;font-weight:400}.rk-rail input{margin-top:2px;accent-color:#B45309}' +
+    '.rk-rail .rk-cnt{margin:6px 2px 0;color:#5B6B7B}.rk-rail button.rk-rst{background:none;border:0;padding:0;font:inherit;color:#B45309;text-decoration:underline;cursor:pointer}' +
+    '.rk-rail a:focus-visible,.rk-rail select:focus-visible,.rk-rail input:focus-visible,.rk-fab:focus-visible{outline:2px solid #D97706;outline-offset:2px}' +
+    '.rk-fab{position:fixed;left:16px;bottom:16px;z-index:41;background:#131313;color:#fff;border:0;border-radius:999px;padding:10px 16px;font:inherit;font-size:14px;font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.18);cursor:pointer;display:none}' +
+    '.rk-fab.on{display:block}.rk-rail.sheet{left:12px!important;right:12px;top:auto;bottom:64px;width:auto!important;max-height:70vh;background:#fff;border:1px solid #E3E9EF;border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.18)}' +
+    '.rk-hide{display:none!important}.rk-none{border:1px dashed #E3E9EF;border-radius:10px;padding:10px 14px;color:#5B6B7B;font-size:14px;margin:0 0 12px}' +
+    '@media (prefers-reduced-motion:reduce){.rk-rail{transition:none}}';
+  var FLT = [['price', 'Pricing published', function (v) { return v.t[0] >= 1; }], ['try', 'Free trial or self-serve signup', function (v) { return v.t[5] === 2; }], ['help', 'Public help center, 50+ articles', function (v) { return v.t[6] === 2; }], ['month', 'Month-to-month stated', function (v) { return /month-to-month|monthly|no long-term|no annual|cancel any/i.test((v.com.contract_term || [''])[0]); }]];
+
+  function rail() {
+    var jump = document.querySelector('.rk-jump'), arts = [].slice.call(document.querySelectorAll('article.rk-r[id]'));
+    if (!jump || !arts.length) return;
+    var secs = [['tier-1', 'Tier 1'], ['tier-2', 'Tier 2'], ['tier-3', 'Tier 3'], ['enterprise', 'Enterprise platforms'], ['methodology', 'Methodology']].filter(function (x) { return document.getElementById(x[0]); });
+    var heads = [].slice.call(document.querySelectorAll('h2[id^="tier-"]'));
+    function tierOf(a) { var t = ''; heads.forEach(function (hd) { if (hd.compareDocumentPosition(a) & 4) t = hd.id; }); return t; }
+    var tiers = {}; arts.forEach(function (a) { var t = tierOf(a); a.setAttribute('data-tier', t); tiers[t] = (tiers[t] || 0) + 1; });
+    var r = document.createElement('nav'); r.className = 'rk-rail'; r.setAttribute('aria-label', 'Jump and filter');
+    var h = '<h5>On this page</h5><a href="#" data-go="top">Top <small>&uarr;</small></a>';
+    secs.forEach(function (x) { h += '<a href="#' + x[0] + '" data-sec="' + x[0] + '">' + x[1] + (tiers[x[0]] ? ' <small data-n="' + x[0] + '">' + tiers[x[0]] + '</small>' : '') + '</a>'; });
+    h += '<a href="#" data-go="bottom">Bottom <small>&darr;</small></a>';
+    h += '<h5>Filter</h5><select aria-label="Must have this feature confirmed"><option value="">Any feature</option>';
+    GROUPS.forEach(function (g) { h += '<optgroup label="' + g[0] + '">'; g[1].forEach(function (f) { h += '<option value="' + f[0] + '">' + esc(f[1]) + '</option>'; }); h += '</optgroup>'; });
+    h += '</select>';
+    FLT.forEach(function (f) { h += '<label><input type="checkbox" value="' + f[0] + '"> <span>' + f[1] + '</span></label>'; });
+    h += '<p class="rk-cnt" aria-live="polite"></p><h5>Vendors</h5>';
+    arts.forEach(function (a) { var v = D.vendors[a.id]; var sc = (a.querySelector('.rk-s b') || {}).textContent || ''; h += '<a href="#' + a.id + '" data-v="' + a.id + '">' + esc(v ? v.n.replace(/ \(.*\)$/, '').replace(/ by Momentm| Technologies/, '') : a.id) + ' <small>' + esc(sc) + '</small></a>'; });
+    r.innerHTML = h; document.body.appendChild(r);
+    var fab = document.createElement('button'); fab.type = 'button'; fab.className = 'rk-fab'; fab.textContent = 'Jump to'; fab.setAttribute('aria-expanded', 'false'); document.body.appendChild(fab);
+    var sheet = false;
+    fab.addEventListener('click', function () { var o = !r.classList.contains('on'); r.classList.toggle('on', o); fab.setAttribute('aria-expanded', o ? 'true' : 'false'); fab.textContent = o ? 'Close' : 'Jump to'; });
+    r.addEventListener('click', function (e) {
+      var a = e.target.closest('a'); if (!a) return;
+      var go = a.getAttribute('data-go');
+      if (go) { e.preventDefault(); window.scrollTo({ top: go === 'top' ? 0 : document.documentElement.scrollHeight, behavior: 'smooth' }); }
+      if (sheet) { r.classList.remove('on'); fab.setAttribute('aria-expanded', 'false'); fab.textContent = 'Jump to'; }
+    });
+    var sel = r.querySelector('select'), boxes = [].slice.call(r.querySelectorAll('input[type=checkbox]')), cnt = r.querySelector('.rk-cnt');
+    function apply() {
+      var f = sel.value, on = boxes.filter(function (b) { return b.checked; }).map(function (b) { return b.value; }), shown = 0, per = {};
+      arts.forEach(function (a) {
+        var v = D.vendors[a.id], ok = true;
+        if (v && f) { var c = v.f[f] || v.nf[f]; ok = !!c && c[0] === 'c'; }
+        if (v) on.forEach(function (k) { FLT.forEach(function (x) { if (x[0] === k && !x[2](v)) ok = false; }); });
+        a.classList.toggle('rk-hide', !ok); if (ok) { shown++; per[a.getAttribute('data-tier')] = (per[a.getAttribute('data-tier')] || 0) + 1; }
+        var l = r.querySelector('a[data-v="' + a.id + '"]'); if (l) l.classList.toggle('dim', !ok);
+      });
+      secs.forEach(function (x) {
+        var n = r.querySelector('small[data-n="' + x[0] + '"]'); if (n) n.textContent = per[x[0]] || 0;
+        var hd = document.getElementById(x[0]), note = hd && hd.parentNode.querySelector('.rk-none[data-for="' + x[0] + '"]');
+        if (!tiers[x[0]] || !hd) return;
+        if (!per[x[0]] && (f || on.length)) { if (!note) { note = document.createElement('p'); note.className = 'rk-none'; note.setAttribute('data-for', x[0]); note.textContent = 'No vendor in this tier matches the filters.'; var after = hd.nextElementSibling && hd.nextElementSibling.classList.contains('lede') ? hd.nextElementSibling : hd; after.parentNode.insertBefore(note, after.nextSibling); } }
+        else if (note) note.parentNode.removeChild(note);
+      });
+      cnt.innerHTML = (f || on.length) ? 'Showing ' + shown + ' of ' + arts.length + '. <button type="button" class="rk-rst">Reset</button>' : '';
+      var rb = cnt.querySelector('.rk-rst'); if (rb) rb.addEventListener('click', function () { sel.value = ''; boxes.forEach(function (b) { b.checked = false; }); apply(); });
+    }
+    sel.addEventListener('change', apply); boxes.forEach(function (b) { b.addEventListener('change', apply); });
+    function place() {
+      var left = arts[0].getBoundingClientRect().left, w = Math.min(210, left - 40);
+      sheet = w < 150;
+      r.classList.toggle('sheet', sheet);
+      if (!sheet) { r.style.width = w + 'px'; r.style.left = Math.max(16, left - w - 24) + 'px'; fab.classList.remove('on'); }
+      else { r.style.width = ''; r.style.left = ''; }
+      tick();
+    }
+    function tick() {
+      var past = jump.getBoundingClientRect().bottom < 0, y = 140, cur = '';
+      if (!sheet) r.classList.toggle('on', past); else { fab.classList.toggle('on', past); if (!past) { r.classList.remove('on'); fab.textContent = 'Jump to'; } }
+      secs.forEach(function (x) { var e = document.getElementById(x[0]); if (e && e.getBoundingClientRect().top < y) cur = x[0]; });
+      var curV = ''; arts.forEach(function (a) { if (!a.classList.contains('rk-hide') && a.getBoundingClientRect().top < y) curV = a.id; });
+      [].forEach.call(r.querySelectorAll('a[data-sec]'), function (a) { a.classList.toggle('cur', a.getAttribute('data-sec') === cur); });
+      [].forEach.call(r.querySelectorAll('a[data-v]'), function (a) { a.classList.toggle('cur', a.getAttribute('data-v') === curV && (cur === 'tier-1' || cur === 'tier-2' || cur === 'tier-3')); });
+    }
+    var raf = 0; window.addEventListener('scroll', function () { if (!raf) raf = requestAnimationFrame(function () { raf = 0; tick(); }); }, { passive: true });
+    window.addEventListener('resize', place); place();
+  }
+
   var D;
   function render(v, tab) { return tab === 'transparency' ? transparency(v) : tab === 'features' ? features(v) : track(v); }
 
@@ -160,9 +246,10 @@
 
   function init(data) {
     D = data;
-    var st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
+    var st = document.createElement('style'); st.textContent = CSS + RCSS; document.head.appendChild(st);
     var arts = document.querySelectorAll('article.rk-r[id]');
     for (var i = 0; i < arts.length; i++) enhance(arts[i]);
+    try { rail(); } catch (e) {}
     fromHash();
     window.addEventListener('hashchange', fromHash);
   }
